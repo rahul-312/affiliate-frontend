@@ -2,7 +2,7 @@
 
 The internal tool for the **affiliate (ops) team** and the **finance team**. Built with Next.js 16 (App Router) and TypeScript.
 
-> The project overview, architecture, product decisions and next steps are in the **[backend README](../affiliate-backend/README.md)**, the main README for all three repos.
+> The project overview, architecture, product decisions and next steps are in the **[backend README](https://github.com/rahul-312/affiliate-backend#readme)**, the main README for all three repos.
 
 ## What it does
 
@@ -15,7 +15,7 @@ Navigation adapts to the signed-in role. Affiliate accounts are refused, since a
 
 ## Run locally
 
-Requires Node.js ≥ 20.11 and the [backend](../affiliate-backend) running (by default on `http://localhost:4000`).
+Requires Node.js ≥ 20.11 and the [backend](https://github.com/rahul-312/affiliate-backend) running (by default on `http://localhost:4000`).
 
 ```bash
 npm install
