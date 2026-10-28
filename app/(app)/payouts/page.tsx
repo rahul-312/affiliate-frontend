@@ -9,6 +9,7 @@ import { formatPaise } from '@/lib/money';
 import { useApi } from '@/lib/useApi';
 import type { Paginated, PayoutBatch, PayoutCandidate } from '@/lib/types';
 import { DataTable, type Column } from '@/components/DataTable';
+import { Icon } from '@/components/Icon';
 import { Notice } from '@/components/Notice';
 import { PageHeader } from '@/components/PageHeader';
 import { StatusBadge } from '@/components/StatusBadge';
@@ -92,10 +93,12 @@ export default function PayoutsPage() {
         actions={
           openBatch ? (
             <Link className="btn btn-primary" href={`/payouts/${openBatch.id}`}>
+              <Icon name="arrowRight" size={16} />
               Continue {openBatch.batchNo}
             </Link>
           ) : (
             <button type="button" className="btn btn-primary" onClick={createBatch} disabled={creating}>
+              <Icon name="plus" size={16} />
               {creating ? 'Creating…' : 'Create payout batch'}
             </button>
           )
@@ -111,7 +114,9 @@ export default function PayoutsPage() {
 
       <div className="card">
         <div className="section-title">
-          <h2>Owed but missing payout details</h2>
+          <h2>
+            <Icon name="alert" /> Owed but missing payout details
+          </h2>
           <span className="sub">Skipped by batching until they add UPI or bank details in the app</span>
         </div>
         {missing.error ? <div className="card-body"><Notice tone="error">{missing.error}</Notice></div> : null}
@@ -126,7 +131,9 @@ export default function PayoutsPage() {
 
       <div className="card">
         <div className="section-title">
-          <h2>Batches</h2>
+          <h2>
+            <Icon name="layers" /> Batches
+          </h2>
         </div>
         <DataTable columns={batchColumns} rows={batches.data?.items ?? null} rowKey={(b) => b.id} loading={batches.loading} emptyMessage="No payout batches yet." />
       </div>

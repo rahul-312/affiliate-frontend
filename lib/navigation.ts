@@ -1,17 +1,19 @@
+import type { IconName } from '@/components/Icon';
 import type { StaffRole } from './types';
 
 export interface NavItem {
   href: string;
   label: string;
+  icon: IconName;
   roles: readonly StaffRole[];
 }
 
 /** Single source of truth for which role sees which page; the (app) layout guard uses it too. */
 export const NAV_ITEMS: readonly NavItem[] = [
-  { href: '/overview', label: 'Overview', roles: ['ops', 'finance'] },
-  { href: '/affiliates', label: 'Affiliates', roles: ['ops', 'finance'] },
-  { href: '/commissions', label: 'Commissions', roles: ['ops', 'finance'] },
-  { href: '/payouts', label: 'Payouts', roles: ['finance'] },
+  { href: '/overview', label: 'Overview', icon: 'home', roles: ['ops', 'finance'] },
+  { href: '/affiliates', label: 'Affiliates', icon: 'users', roles: ['ops', 'finance'] },
+  { href: '/commissions', label: 'Commissions', icon: 'coins', roles: ['ops', 'finance'] },
+  { href: '/payouts', label: 'Payouts', icon: 'banknote', roles: ['finance'] },
 ];
 
 export function canAccess(pathname: string, role: StaffRole): boolean {

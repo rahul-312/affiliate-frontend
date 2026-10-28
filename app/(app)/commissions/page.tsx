@@ -9,6 +9,7 @@ import { useApi } from '@/lib/useApi';
 import type { Commission, CommissionStatus, Paginated } from '@/lib/types';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { DataTable, type Column } from '@/components/DataTable';
+import { Icon } from '@/components/Icon';
 import { Notice } from '@/components/Notice';
 import { PageHeader } from '@/components/PageHeader';
 import { SimulateSaleModal } from '@/components/SimulateSaleModal';
@@ -116,11 +117,13 @@ export default function CommissionsPage() {
       header: '',
       render: (c) =>
         c.status === 'pending' ? (
-          <div style={{ display: 'flex', gap: 6 }}>
+          <div className="row-actions">
             <button type="button" className="btn btn-sm btn-primary" onClick={() => setDecision({ kind: 'approve', ids: [c.id] })}>
+              <Icon name="check" size={14} />
               Approve
             </button>
             <button type="button" className="btn btn-sm btn-danger" onClick={() => setDecision({ kind: 'reject', ids: [c.id] })}>
+              <Icon name="x" size={14} />
               Reject
             </button>
           </div>
@@ -136,6 +139,7 @@ export default function CommissionsPage() {
         actions={
           isOps ? (
             <button type="button" className="btn" onClick={() => setSimulating(true)}>
+              <Icon name="plus" size={16} />
               Simulate sale
             </button>
           ) : null

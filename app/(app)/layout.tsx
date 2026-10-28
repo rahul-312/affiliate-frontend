@@ -4,6 +4,7 @@ import { useEffect, type ReactNode } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { canAccess } from '@/lib/navigation';
+import { LeafShadow } from '@/components/Decor';
 import { Sidebar } from '@/components/Sidebar';
 
 /**
@@ -27,7 +28,10 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   return (
     <div className="shell">
       <Sidebar />
-      <main className="content">{children}</main>
+      <main className="content">
+        <LeafShadow className="page-leaf" />
+        {children}
+      </main>
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { errorMessage, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import { LeafShadow } from '@/components/Decor';
 import { Notice } from '@/components/Notice';
 
 export default function LoginPage() {
@@ -32,12 +33,18 @@ export default function LoginPage() {
 
   return (
     <main className="login-wrap">
-      <div className="card login-card">
-        <div className="card-body" style={{ padding: 28 }}>
-          <h1>Affiliate Hub</h1>
-          <p className="sub" style={{ marginTop: 0, marginBottom: 20 }}>
-            Sign in to the ops &amp; finance dashboard
-          </p>
+      <section className="login-art" aria-hidden="true">
+        <LeafShadow className="login-leaf" />
+        <div className="login-art-copy">
+          <div className="eyebrow">Affiliate Hub</div>
+          <p className="login-quote">Every referral, reviewed and paid with care.</p>
+        </div>
+      </section>
+      <section className="login-panel">
+        <div className="login-card">
+          <div className="eyebrow">Welcome back</div>
+          <h1>Sign in</h1>
+          <p className="page-subtitle">Ops &amp; finance dashboard</p>
           {error ? <Notice tone="error">{error}</Notice> : null}
           <form onSubmit={submit}>
             <div className="field">
@@ -48,7 +55,7 @@ export default function LoginPage() {
               <label htmlFor="password">Password</label>
               <input id="password" type="password" className="input" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
             </div>
-            <button type="submit" className="btn btn-primary" style={{ width: '100%' }} disabled={busy}>
+            <button type="submit" className="btn btn-primary btn-lg" disabled={busy}>
               {busy ? 'Signing in…' : 'Sign in'}
             </button>
           </form>
@@ -57,7 +64,7 @@ export default function LoginPage() {
             payouts. The first request can take ~30s while the free-tier API wakes up.
           </div>
         </div>
-      </div>
+      </section>
     </main>
   );
 }
