@@ -65,6 +65,8 @@ export interface BatchItem {
   failureReason: string | null;
   /** Ops deactivated this affiliate after the batch was created: don't pay them from this batch. */
   onHold?: boolean;
+  /** A CSV download left this affiliate out (they were on hold then); confirm must say whether they were paid. */
+  excludedFromExport?: boolean;
 }
 
 export interface PayoutBatch {

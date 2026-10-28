@@ -102,7 +102,7 @@ export default function OverviewPage() {
 
 /** Approved earnings held because ops deactivated the affiliate; shown whether or not a batch is open. */
 function onHoldNote(data: OverviewStats) {
-  return data.onHold.count > 0
-    ? `${formatPaise(data.onHold.amountPaise)} for ${data.onHold.count} affiliate(s) is on hold until ops reactivates them.`
-    : null;
+  if (data.onHold.count === 0) return null;
+  const where = data.openBatch ? ' outside the open batch' : '';
+  return `${formatPaise(data.onHold.amountPaise)} for ${data.onHold.count} affiliate(s)${where} is on hold until ops reactivates them.`;
 }

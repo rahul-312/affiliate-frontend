@@ -38,6 +38,9 @@ const itemColumns = (showReason: boolean): Column<BatchItem>[] => [
       <>
         <StatusBadge status={i.status} />
         {i.onHold && i.status === 'pending' ? <div className="sub">On hold: deactivated by ops</div> : null}
+        {!i.onHold && i.excludedFromExport && i.status === 'pending' ? (
+          <div className="sub">Left out of a CSV download: confirm whether it was paid</div>
+        ) : null}
       </>
     ),
   },
@@ -192,7 +195,9 @@ export default function PayoutBatchPage({ params }: { params: Promise<{ id: stri
         </div>
       )}
 
-      {confirming ? <ConfirmPayoutDialog batch={batch} onClose={() => setConfirming(false)} onConfirmed={reload} /> : null}
+      {confirming ? (
+        <ConfirmPayoutDialog batch={batch} onClose={() => setConfirming(false)} onConfirmed={reload} onRefresh={reload} />
+      ) : null}
       {cancelling ? (
         <ConfirmDialog
           title={`Cancel ${batch.batchNo}?`}
