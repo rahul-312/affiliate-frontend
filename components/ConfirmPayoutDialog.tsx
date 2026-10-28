@@ -23,6 +23,20 @@ const EXCLUDED_FAILURE_REASON = 'Left out of the CSV sent to the bank';
 /** Items the server can't settle on its own: on hold now, or left out of a CSV download. */
 const needsDecision = (item: BatchItem) => Boolean(item.onHold || item.excludedFromExport);
 
+const PREFILLED_REASONS = new Set([HELD_FAILURE_REASON, EXCLUDED_FAILURE_REASON]);
+
+/**
+ * A reason we pre-filled describes the item's situation when it was answered. If a refresh changed
+ * that situation (e.g. the hold was lifted), swap in the matching text, or clear it so finance writes
+ * one; a reason finance typed is always kept.
+ */
+function effectiveReason(item: BatchItem | undefined, raw: string) {
+  if (!item || !PREFILLED_REASONS.has(raw)) return raw;
+  if (item.onHold) return HELD_FAILURE_REASON;
+  if (item.excludedFromExport) return EXCLUDED_FAILURE_REASON;
+  return '';
+}
+
 /**
  * Finance confirms the bank transfer with its reference. Any affiliate whose
  * transfer failed is ticked with a reason; their commissions return to
@@ -44,7 +58,9 @@ export function ConfirmPayoutDialog({ batch, onClose, onConfirmed, onRefresh }: 
   const failedIds = Object.keys(failed);
   const failedTotal = items.filter((i) => failedIds.includes(i.affiliate.id)).reduce((sum, i) => sum + i.amountPaise, 0);
   const referenceValid = REFERENCE_PATTERN.test(reference.trim());
-  const reasonsValid = failedIds.every((id) => (failed[id] ?? '').trim().length >= 3);
+  const reasonOf = (affiliateId: string) =>
+    effectiveReason(items.find((i) => i.affiliate.id === affiliateId), failed[affiliateId] ?? '');
+  const reasonsValid = failedIds.every((id) => reasonOf(id).trim().length >= 3);
   const decisionItems = items.filter(needsDecision);
   const heldDecided = decisionItems.every((i) => i.affiliate.id in heldSent);
   // Held money answered "not sent" isn't retried until ops reactivates the affiliate, so it's shown separately.
@@ -77,7 +93,7 @@ export function ConfirmPayoutDialog({ batch, onClose, onConfirmed, onRefresh }: 
         method: 'POST',
         body: {
           paymentReference: reference.trim(),
-          failedItems: failedIds.map((affiliateId) => ({ affiliateId, reason: (failed[affiliateId] ?? '').trim() })),
+          failedItems: failedIds.map((affiliateId) => ({ affiliateId, reason: reasonOf(affiliateId).trim() })),
           heldPaidAcknowledged: decisionItems.map((i) => i.affiliate.id).filter((affiliateId) => heldSent[affiliateId]),
         },
       });
@@ -85,7 +101,7 @@ export function ConfirmPayoutDialog({ batch, onClose, onConfirmed, onRefresh }: 
       onClose();
     } catch (err) {
       // A hold started or ended while the dialog was open: reload so the questions match the server.
-      if (err instanceof ApiError && (err.code === 'PAYOUT_ON_HOLD' || err.status === 400)) {
+      if (err instanceof ApiError && (err.code === 'PAYOUT_ON_HOLD' || err.code === 'BAD_REQUEST')) {
         await onRefresh();
         setError(`${errorMessage(err)} The batch has been refreshed: check the questions below and confirm again.`);
       } else {
@@ -164,7 +180,7 @@ export function ConfirmPayoutDialog({ batch, onClose, onConfirmed, onRefresh }: 
                     className="input"
                     style={{ marginTop: 8 }}
                     placeholder="Reason, at least 3 characters"
-                    value={failed[id]}
+                    value={reasonOf(id)}
                     maxLength={500}
                     onChange={(e) => setFailed((current) => ({ ...current, [id]: e.target.value }))}
                     aria-label={`Failure reason for ${name}`}
@@ -190,7 +206,7 @@ export function ConfirmPayoutDialog({ batch, onClose, onConfirmed, onRefresh }: 
                   className="input"
                   style={{ marginTop: 8 }}
                   placeholder="Reason, e.g. account closed"
-                  value={failed[item.affiliate.id]}
+                  value={reasonOf(item.affiliate.id)}
                   maxLength={500}
                   onChange={(e) => setFailed((current) => ({ ...current, [item.affiliate.id]: e.target.value }))}
                   aria-label={`Failure reason for ${item.affiliate.name ?? item.affiliate.id}`}
