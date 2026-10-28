@@ -15,7 +15,10 @@ export function PageHeader({
   return (
     <div className="page-header">
       <div>
-        <div className="eyebrow">{eyebrow ?? title}</div>
+        {/* When it just repeats the title, hide the copy from screen readers so it isn't announced twice. */}
+        <div className="eyebrow" aria-hidden={eyebrow ? undefined : true}>
+          {eyebrow ?? title}
+        </div>
         <h1>{title}</h1>
         {subtitle ? <div className="page-subtitle">{subtitle}</div> : null}
       </div>

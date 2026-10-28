@@ -6,21 +6,20 @@ export function LeafShadow({ className }: { className?: string }) {
   const fronds = [
     { x: 40, y: 20, rotate: 28, scale: 1 },
     { x: 120, y: -10, rotate: 62, scale: 0.85 },
-    { x: 10, y: 120, rotate: 8, scale: 0.7 },
   ];
   return (
     <svg className={className} viewBox="0 0 420 360" aria-hidden="true" focusable="false">
       <defs>
         <filter id={blurId} x="-20%" y="-20%" width="140%" height="140%">
-          <feGaussianBlur stdDeviation="4" />
+          <feGaussianBlur stdDeviation="3" />
         </filter>
       </defs>
       <g filter={`url(#${blurId})`} fill="currentColor">
         {fronds.map((f, fi) => (
           <g key={fi} transform={`translate(${f.x} ${f.y}) rotate(${f.rotate}) scale(${f.scale})`}>
             <path d="M0 0 Q160 10 330 40" stroke="currentColor" strokeWidth="3" fill="none" />
-            {Array.from({ length: 16 }, (_, i) => {
-              const t = i / 16;
+            {Array.from({ length: 11 }, (_, i) => {
+              const t = i / 11;
               const x = 20 + t * 300;
               const y = 4 + t * t * 34;
               const len = 92 * (1 - t * 0.72);

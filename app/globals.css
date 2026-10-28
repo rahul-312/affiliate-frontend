@@ -1,4 +1,4 @@
-/* Warm, editorial theme shared with the mobile app (see affiliate-mobile/src/components/lux.tsx). */
+/* Warm, editorial theme; the palette mirrors the mobile app. Light only, by design. */
 :root {
   color-scheme: light;
   --bg: #faf6f1;
@@ -8,8 +8,7 @@
   --border: #ece4da;
   --border-strong: #ddd2c4;
   --text: #161412;
-  --text-muted: #7a7168;
-  --text-soft: #9a9087;
+  --text-muted: #6b635b;
   --sand-1: #f1e9df;
   --sand-2: #ece2d5;
   --sand-3: #e0d2bf;
@@ -44,7 +43,6 @@ body {
     radial-gradient(1200px 600px at 85% -10%, var(--bg-glow), transparent 60%),
     radial-gradient(900px 500px at -10% 110%, var(--bg-glow), transparent 60%),
     var(--bg);
-  background-attachment: fixed;
   color: var(--text);
   font-family: var(--font);
   font-size: 14px;
@@ -56,13 +54,14 @@ a:hover { text-decoration: underline; }
 h1, h2, h3 { margin: 0; line-height: 1.15; font-weight: 400; }
 h1 { font-family: var(--display); font-size: 46px; letter-spacing: -0.01em; }
 h2 { font-family: var(--display); font-size: 21px; }
-code, .mono { font-family: var(--mono); font-size: 12.5px; background: var(--surface-muted); padding: 1px 6px; border-radius: 6px; }
+code, .mono { font-family: var(--mono); font-size: 12.5px; }
+code { background: var(--surface-muted); padding: 1px 6px; border-radius: 6px; }
 .icon { flex-shrink: 0; }
 
 /* ---------- shell ---------- */
 .shell { display: flex; min-height: 100vh; }
 .sidebar {
-  position: sticky; top: 0; height: 100vh; overflow: hidden;
+  position: sticky; top: 0; height: 100vh; overflow-x: hidden; overflow-y: auto;
   width: 208px; flex-shrink: 0; border-right: 1px solid var(--border);
   padding: 28px 14px 20px; display: flex; flex-direction: column;
 }
@@ -79,7 +78,7 @@ code, .mono { font-family: var(--mono); font-size: 12.5px; background: var(--sur
 .who-row { display: flex; align-items: center; gap: 12px; padding: 0 2px 14px; }
 .avatar {
   width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0;
-  background: var(--sand-3); color: var(--surface); font-size: 13px; font-weight: 600; letter-spacing: 0.04em;
+  background: var(--sand-3); color: var(--text); font-size: 13px; font-weight: 600; letter-spacing: 0.04em;
 }
 .sidebar-footer .who { font-weight: 600; }
 .sidebar-footer .role { color: var(--text-muted); text-transform: capitalize; font-size: 13px; }
@@ -107,7 +106,7 @@ code, .mono { font-family: var(--mono); font-size: 12.5px; background: var(--sur
   .nav-link { padding: 8px 12px; }
   .sidebar-footer { margin: 0 0 0 auto; border: 0; padding: 0; display: flex; gap: 10px; align-items: center; background: none; }
   .who-row { padding: 0; }
-  .who-row > div { display: none; }
+  .who-row > div { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   .signout { width: auto; }
   .content { padding: 28px 16px 48px; }
   .page-leaf { width: 300px; right: -100px; }
@@ -208,6 +207,7 @@ textarea.input { min-height: 90px; resize: vertical; }
 .dialog-header p { color: var(--text-muted); margin: 8px 0 0; }
 .dialog-body { padding: 20px 28px; }
 .dialog-body .card { box-shadow: none; }
+.dialog-body .card + .card { margin-top: 0; }
 .dialog-footer { display: flex; justify-content: flex-end; gap: 10px; padding: 4px 28px 24px; }
 
 /* ---------- login ---------- */
@@ -223,7 +223,7 @@ textarea.input { min-height: 90px; resize: vertical; }
 .demo-accounts { margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--border); font-size: 12.5px; color: var(--text-muted); line-height: 1.7; }
 @media (max-width: 860px) {
   .login-wrap { grid-template-columns: 1fr; }
-  .login-art { min-height: 220px; border-right: 0; border-bottom: 1px solid var(--border); }
+  .login-art { order: 1; min-height: 160px; border-right: 0; border-top: 1px solid var(--border); }
   .login-art-copy { padding: 32px 16px 0; }
   .login-quote { font-size: 28px; max-width: 280px; }
   .login-panel { padding: 32px 16px 48px; }
