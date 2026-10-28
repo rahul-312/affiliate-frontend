@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
-import { use, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { use, useEffect, useState } from 'react';
 import { apiDownload, apiRequest, errorMessage } from '@/lib/api';
 import { formatDateTime } from '@/lib/format';
 import { formatPaise } from '@/lib/money';
@@ -51,7 +51,13 @@ export default function PayoutBatchPage({ params }: { params: Promise<{ id: stri
   const [message, setMessage] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
 
   // Set by the payouts page when batch creation left out affiliates whose payouts are on hold.
-  const skippedOnHold = Number(useSearchParams().get('onHold') ?? 0);
+  // Read once, then removed from the URL so a refresh or a shared link doesn't show a stale count.
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const [skippedOnHold] = useState(() => Number(searchParams.get('onHold') ?? 0));
+  useEffect(() => {
+    if (searchParams.has('onHold')) router.replace(`/payouts/${encodeURIComponent(id)}`, { scroll: false });
+  }, [searchParams, router, id]);
 
   const { data: batch, error, reload } = useApi(`batch:${id}`, () =>
     apiRequest<PayoutBatch>(`/admin/payouts/${encodeURIComponent(id)}`),
@@ -129,7 +135,7 @@ export default function PayoutBatchPage({ params }: { params: Promise<{ id: stri
         <Notice tone="warning">
           {batch.status === 'draft'
             ? `Payouts are now on hold for ${heldNames}. Cancel this draft and create a new batch; held affiliates are left out automatically.`
-            : `Payouts are now on hold for ${heldNames}. Don't pay them: mark them as failed when you confirm this batch.`}
+            : `Payouts are now on hold for ${heldNames}. If their transfer hasn't gone out yet, don't send it. When you confirm, say whether the bank already paid them. A re-downloaded CSV leaves them out.`}
         </Notice>
       ) : null}
       {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}

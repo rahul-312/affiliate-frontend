@@ -76,7 +76,8 @@ export default function OverviewPage() {
                 {data.openBatch ? (
                   <p>
                     <Link href={`/payouts/${data.openBatch.id}`}>{data.openBatch.batchNo}</Link> is open (<StatusBadge status={data.openBatch.status} />) for{' '}
-                    {formatPaise(data.openBatch.originalTotalPaise)}. Finish or cancel it before creating another.
+                    {formatPaise(data.openBatch.originalTotalPaise)}. Finish or cancel it before creating another.{' '}
+                    {onHoldNote(data)}
                   </p>
                 ) : (
                   <p>
@@ -84,9 +85,7 @@ export default function OverviewPage() {
                     {data.missingPayoutDetailsCount > 0
                       ? `${data.missingPayoutDetailsCount} affiliate(s) can't be paid yet because they haven't added payout details.`
                       : null}{' '}
-                    {data.onHold.count > 0
-                      ? `${formatPaise(data.onHold.amountPaise)} for ${data.onHold.count} affiliate(s) is on hold until ops reactivates them.`
-                      : null}{' '}
+                    {onHoldNote(data)}{' '}
                     <Link href="/payouts" className="inline-arrow">
                       Go to payouts <Icon name="arrowRight" size={14} />
                     </Link>
@@ -99,4 +98,11 @@ export default function OverviewPage() {
       )}
     </>
   );
+}
+
+/** Approved earnings held because ops deactivated the affiliate; shown whether or not a batch is open. */
+function onHoldNote(data: OverviewStats) {
+  return data.onHold.count > 0
+    ? `${formatPaise(data.onHold.amountPaise)} for ${data.onHold.count} affiliate(s) is on hold until ops reactivates them.`
+    : null;
 }

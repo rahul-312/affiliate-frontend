@@ -48,6 +48,6 @@ export function useFocusedList<S extends string, T>({ name, focus, fetchList }: 
     loading: current.loading,
     reload,
     /** True when the page fell back to "All" because the focus list couldn't be loaded. */
-    focusCheckFailed: chosen === null && Boolean(initial?.checkFailed),
+    focusCheckFailed: chosen === null && Boolean(initial?.checkFailed) && focusList.data === null,
   };
 }

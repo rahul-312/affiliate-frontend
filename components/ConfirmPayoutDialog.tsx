@@ -15,18 +15,23 @@ interface ConfirmPayoutDialogProps {
 
 const REFERENCE_PATTERN = /^[A-Za-z0-9\-_/]{4,64}$/;
 
+const HELD_FAILURE_REASON = 'Payout on hold: affiliate deactivated by ops';
+
 /**
  * Finance confirms the bank transfer with its reference. Any affiliate whose
  * transfer failed is ticked with a reason; their commissions return to
  * "approved" and are retried in the next batch.
+ *
+ * An affiliate put on hold after the CSV was downloaded needs an explicit
+ * answer, because only finance knows whether the bank already sent it:
+ * "sent" records it as paid (so it is never paid twice), "not sent" marks it
+ * failed and the money stays held.
  */
 export function ConfirmPayoutDialog({ batch, onClose, onConfirmed }: ConfirmPayoutDialogProps) {
   const items = batch.items ?? [];
   const [reference, setReference] = useState('');
-  // Affiliates put on hold after the batch was created start ticked as failed: the server refuses to pay them.
-  const [failed, setFailed] = useState<Record<string, string>>(() =>
-    Object.fromEntries(items.filter((i) => i.onHold).map((i) => [i.affiliate.id, 'Payout on hold: affiliate deactivated by ops'])),
-  );
+  const [failed, setFailed] = useState<Record<string, string>>({});
+  const [heldSent, setHeldSent] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,6 +39,18 @@ export function ConfirmPayoutDialog({ batch, onClose, onConfirmed }: ConfirmPayo
   const failedTotal = items.filter((i) => failedIds.includes(i.affiliate.id)).reduce((sum, i) => sum + i.amountPaise, 0);
   const referenceValid = REFERENCE_PATTERN.test(reference.trim());
   const reasonsValid = failedIds.every((id) => (failed[id] ?? '').trim().length >= 3);
+  const heldItems = items.filter((i) => i.onHold);
+  const heldDecided = heldItems.every((i) => i.affiliate.id in heldSent);
+
+  const decideHeld = (affiliateId: string, sent: boolean) => {
+    setHeldSent((current) => ({ ...current, [affiliateId]: sent }));
+    setFailed((current) => {
+      const next = { ...current };
+      if (sent) delete next[affiliateId];
+      else next[affiliateId] = current[affiliateId] ?? HELD_FAILURE_REASON;
+      return next;
+    });
+  };
 
   const toggle = (affiliateId: string) =>
     setFailed((current) => {
@@ -52,6 +69,7 @@ export function ConfirmPayoutDialog({ batch, onClose, onConfirmed }: ConfirmPayo
         body: {
           paymentReference: reference.trim(),
           failedItems: failedIds.map((affiliateId) => ({ affiliateId, reason: (failed[affiliateId] ?? '').trim() })),
+          heldPaidAcknowledged: Object.keys(heldSent).filter((affiliateId) => heldSent[affiliateId]),
         },
       });
       onConfirmed();
@@ -72,7 +90,7 @@ export function ConfirmPayoutDialog({ batch, onClose, onConfirmed }: ConfirmPayo
           <button type="button" className="btn" onClick={onClose} disabled={busy}>
             Cancel
           </button>
-          <button type="button" className="btn btn-primary" onClick={submit} disabled={busy || !referenceValid || !reasonsValid}>
+          <button type="button" className="btn btn-primary" onClick={submit} disabled={busy || !referenceValid || !reasonsValid || !heldDecided}>
             {busy ? 'Confirming…' : failedIds.length ? `Confirm, ${failedIds.length} failed` : 'Confirm all paid'}
           </button>
         </>
@@ -99,6 +117,44 @@ export function ConfirmPayoutDialog({ batch, onClose, onConfirmed }: ConfirmPayo
       </div>
       {items.map((item) => {
         const isFailed = item.affiliate.id in failed;
+        if (item.onHold) {
+          const id = item.affiliate.id;
+          const name = item.affiliate.name ?? id;
+          return (
+            <div key={id} className="card" style={{ marginBottom: 8 }}>
+              <div className="card-body" style={{ padding: '10px 14px' }}>
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                  <span style={{ flex: 1 }}>
+                    <strong>{name}</strong>
+                    <span className="sub"> · on hold, deactivated by ops after the CSV was downloaded</span>
+                  </span>
+                  <strong className="mono">{formatPaise(item.amountPaise)}</strong>
+                </div>
+                <fieldset style={{ border: 0, padding: 0, margin: '8px 0 0' }}>
+                  <legend className="hint">Did the bank already send this transfer?</legend>
+                  <label style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer' }}>
+                    <input type="radio" name={`held-${id}`} checked={heldSent[id] === true} onChange={() => decideHeld(id, true)} />
+                    Yes, it went out: record it as paid
+                  </label>
+                  <label style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer' }}>
+                    <input type="radio" name={`held-${id}`} checked={heldSent[id] === false} onChange={() => decideHeld(id, false)} />
+                    No: mark it failed and keep the money on hold
+                  </label>
+                </fieldset>
+                {heldSent[id] === false ? (
+                  <input
+                    className="input"
+                    style={{ marginTop: 8 }}
+                    value={failed[id]}
+                    maxLength={500}
+                    onChange={(e) => setFailed((current) => ({ ...current, [id]: e.target.value }))}
+                    aria-label={`Failure reason for ${name}`}
+                  />
+                ) : null}
+              </div>
+            </div>
+          );
+        }
         return (
           <div key={item.affiliate.id} className="card" style={{ marginBottom: 8 }}>
             <div className="card-body" style={{ padding: '10px 14px' }}>
