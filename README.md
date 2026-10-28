@@ -50,7 +50,7 @@ Open <http://localhost:3000> and sign in with one of these accounts:
 | `ops@demo.com` | `demo1234` | Ops |
 | `finance@demo.com` | `demo1234` | Finance |
 
-Affiliate accounts can't sign in here. Affiliates use the mobile app.
+Affiliate accounts can't sign in here. Affiliates use the mobile app: [download the APK](https://expo.dev/artifacts/eas/U4et7s8_Sq4w46JvFEG9n6UOSVEk36MbODCyVr-M_tg.apk).
 
 ---
 
