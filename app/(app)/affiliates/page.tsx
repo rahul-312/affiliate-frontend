@@ -243,7 +243,14 @@ export default function AffiliatesPage() {
           onClose={() => setAction(null)}
         />
       ) : null}
-      {action?.kind === 'reactivate' ? <ReactivateDialog affiliate={action.affiliate} rateBps={rateOf(action.affiliate)} onConfirm={(note) => setActive(action.affiliate, true, note)} onClose={() => setAction(null)} /> : null}
+      {action?.kind === 'reactivate' ? (
+        <ReactivateDialog
+          affiliate={action.affiliate}
+          rateBps={rateOf(action.affiliate)}
+          onConfirm={(note) => setActive(action.affiliate, true, note)}
+          onClose={() => setAction(null)}
+        />
+      ) : null}
       {action?.kind === 'approve' ? (
         <RateDialog
           title={`Approve ${action.affiliate.name}?`}
@@ -257,7 +264,14 @@ export default function AffiliatesPage() {
           onClose={() => setAction(null)}
         />
       ) : null}
-      {action?.kind === 'rate' ? <EditRateDialog affiliate={action.affiliate} rateBps={rateOf(action.affiliate)} onConfirm={(rateBps) => changeRate(action.affiliate, rateBps)} onClose={() => setAction(null)} /> : null}
+      {action?.kind === 'rate' ? (
+        <EditRateDialog
+          affiliate={action.affiliate}
+          rateBps={rateOf(action.affiliate)}
+          onConfirm={(rateBps) => changeRate(action.affiliate, rateBps)}
+          onClose={() => setAction(null)}
+        />
+      ) : null}
     </>
   );
 }
@@ -277,7 +291,7 @@ function ReactivateDialog({ affiliate, rateBps, onConfirm, onClose }: AffiliateD
       ? `${affiliate.name} paused their account themselves${affiliate.deactivationReason ? ` ("${affiliate.deactivationReason}")` : ''}. Reactivating overrides their choice, so consider checking with them first.`
       : null,
     `Their referral link goes live again${rateBps !== null ? ` at their ${formatBps(rateBps)} rate` : ''}${
-      affiliate.deactivatedBy === 'ops' ? ', and their held payouts go out in the next payout run' : ''
+      affiliate.deactivatedBy === 'ops' ? ', and their held earnings become eligible for the next payout run' : ''
     }.`,
   ]
     .filter(Boolean)
@@ -299,10 +313,15 @@ function EditRateDialog({ affiliate, rateBps, onConfirm, onClose }: AffiliateDia
   return (
     <RateDialog
       title={`Change ${affiliate.name}'s rate`}
-      description={`Currently ${formatBps(rateBps)}.`}
+      description={
+        affiliate.commissionRateBps !== null && affiliate.commissionRateBps !== undefined
+          ? `Currently ${formatBps(rateBps)}.`
+          : `Currently on the standard rate (${formatBps(rateBps)}). Saving pins them to the rate you choose, even if the standard rate changes later.`
+      }
       confirmLabel="Save rate"
       initialBps={rateBps}
-      requireChange
+      // Without a stored rate they follow the standard rate; saving it as-is pins them to it.
+      requireChange={affiliate.commissionRateBps !== null && affiliate.commissionRateBps !== undefined}
       onConfirm={async (next) => {
         if (next !== null) await onConfirm(next);
       }}

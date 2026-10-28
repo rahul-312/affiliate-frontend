@@ -63,6 +63,8 @@ export interface BatchItem {
   commissionCount: number;
   status: BatchItemStatus;
   failureReason: string | null;
+  /** Ops deactivated this affiliate after the batch was created: don't pay them from this batch. */
+  onHold?: boolean;
 }
 
 export interface PayoutBatch {
@@ -105,6 +107,8 @@ export interface OverviewStats {
   paidThisMonthPaise: number;
   readyForPayoutPaise: number;
   missingPayoutDetailsCount: number;
+  /** Approved earnings held because ops deactivated the affiliate. */
+  onHold: { count: number; amountPaise: number };
   openBatch: { id: string; batchNo: string; status: BatchStatus; originalTotalPaise: number } | null;
 }
 

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { use, useState } from 'react';
 import { apiDownload, apiRequest, errorMessage } from '@/lib/api';
 import { formatDateTime } from '@/lib/format';
@@ -30,7 +31,16 @@ const itemColumns = (showReason: boolean): Column<BatchItem>[] => [
   { key: 'count', header: 'Commissions', numeric: true, render: (i) => i.commissionCount },
   { key: 'amount', header: 'Amount', numeric: true, render: (i) => <strong>{formatPaise(i.amountPaise)}</strong> },
   ...(showReason ? [{ key: 'reason', header: 'Reason', render: (i: BatchItem) => i.failureReason ?? '—' }] : []),
-  { key: 'status', header: 'Status', render: (i) => <StatusBadge status={i.status} /> },
+  {
+    key: 'status',
+    header: 'Status',
+    render: (i) => (
+      <>
+        <StatusBadge status={i.status} />
+        {i.onHold && i.status === 'pending' ? <div className="sub">On hold: deactivated by ops</div> : null}
+      </>
+    ),
+  },
 ];
 
 export default function PayoutBatchPage({ params }: { params: Promise<{ id: string }> }) {
@@ -39,6 +49,9 @@ export default function PayoutBatchPage({ params }: { params: Promise<{ id: stri
   const [cancelling, setCancelling] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [message, setMessage] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
+
+  // Set by the payouts page when batch creation left out affiliates whose payouts are on hold.
+  const skippedOnHold = Number(useSearchParams().get('onHold') ?? 0);
 
   const { data: batch, error, reload } = useApi(`batch:${id}`, () =>
     apiRequest<PayoutBatch>(`/admin/payouts/${encodeURIComponent(id)}`),
@@ -67,6 +80,8 @@ export default function PayoutBatchPage({ params }: { params: Promise<{ id: stri
   const isClosed = batch.status === 'paid' || batch.status === 'closed_with_failures';
   const paidItems = items.filter((i) => i.status === 'paid');
   const failedItems = items.filter((i) => i.status === 'failed');
+  const heldItems = isOpen ? items.filter((i) => i.onHold && i.status === 'pending') : [];
+  const heldNames = heldItems.map((i) => i.affiliate.name ?? i.affiliate.id).join(', ');
 
   return (
     <>
@@ -105,6 +120,18 @@ export default function PayoutBatchPage({ params }: { params: Promise<{ id: stri
           ) : null
         }
       />
+      {skippedOnHold > 0 ? (
+        <Notice tone="info">
+          {skippedOnHold} affiliate(s) with approved earnings were left out because their payouts are on hold (deactivated by ops).
+        </Notice>
+      ) : null}
+      {heldItems.length > 0 ? (
+        <Notice tone="warning">
+          {batch.status === 'draft'
+            ? `Payouts are now on hold for ${heldNames}. Cancel this draft and create a new batch; held affiliates are left out automatically.`
+            : `Payouts are now on hold for ${heldNames}. Don't pay them: mark them as failed when you confirm this batch.`}
+        </Notice>
+      ) : null}
       {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
       {batch.status === 'draft' ? (
         <Notice tone="info">Step 1: download the CSV and upload it to the bank. Downloading does not mark anything as paid.</Notice>

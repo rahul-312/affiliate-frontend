@@ -23,7 +23,10 @@ const REFERENCE_PATTERN = /^[A-Za-z0-9\-_/]{4,64}$/;
 export function ConfirmPayoutDialog({ batch, onClose, onConfirmed }: ConfirmPayoutDialogProps) {
   const items = batch.items ?? [];
   const [reference, setReference] = useState('');
-  const [failed, setFailed] = useState<Record<string, string>>({});
+  // Affiliates put on hold after the batch was created start ticked as failed: the server refuses to pay them.
+  const [failed, setFailed] = useState<Record<string, string>>(() =>
+    Object.fromEntries(items.filter((i) => i.onHold).map((i) => [i.affiliate.id, 'Payout on hold: affiliate deactivated by ops'])),
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

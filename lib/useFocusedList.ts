@@ -15,15 +15,22 @@ interface FocusedListOptions<S extends string, T> {
 /**
  * A status-filtered list that opens on the `focus` tab when it has items and on
  * "All" otherwise. The focus list is fetched straight away and doubles as the
- * "is there anything to do?" check, so a busy queue costs one request. Once the
- * user picks a tab, that choice sticks.
+ * "is there anything to do?" check, so a busy queue costs one request. The
+ * automatic choice is made once, on the first load, so clearing the last item
+ * or a failed refresh doesn't switch tabs under the user; a tab the user picks
+ * always sticks.
  */
 export function useFocusedList<S extends string, T>({ name, focus, fetchList }: FocusedListOptions<S, T>) {
   const [chosen, setChosen] = useState<S | 'all' | null>(null);
+  const [initial, setInitial] = useState<{ status: S | 'all'; checkFailed: boolean } | null>(null);
 
   const focusList = useApi(`${name}:${focus}`, () => fetchList(focus));
-  const autoStatus: S | 'all' = focusList.error || focusList.data?.total === 0 ? 'all' : focus;
-  const status = chosen ?? autoStatus;
+  const settled = focusList.data !== null || focusList.error !== null;
+  if (initial === null && settled) {
+    // Adjusting state during render (React's documented pattern for deriving from a first result).
+    setInitial({ status: focusList.error || focusList.data?.total === 0 ? 'all' : focus, checkFailed: Boolean(focusList.error) });
+  }
+  const status = chosen ?? initial?.status ?? focus;
 
   const otherList = useApi(`${name}:view:${status}`, () => (status === focus ? Promise.resolve(null) : fetchList(status)));
   const current = status === focus ? focusList : otherList;
@@ -41,6 +48,6 @@ export function useFocusedList<S extends string, T>({ name, focus, fetchList }: 
     loading: current.loading,
     reload,
     /** True when the page fell back to "All" because the focus list couldn't be loaded. */
-    focusCheckFailed: chosen === null && status !== focus && Boolean(focusList.error),
+    focusCheckFailed: chosen === null && Boolean(initial?.checkFailed),
   };
 }

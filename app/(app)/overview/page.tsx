@@ -84,6 +84,9 @@ export default function OverviewPage() {
                     {data.missingPayoutDetailsCount > 0
                       ? `${data.missingPayoutDetailsCount} affiliate(s) can't be paid yet because they haven't added payout details.`
                       : null}{' '}
+                    {data.onHold.count > 0
+                      ? `${formatPaise(data.onHold.amountPaise)} for ${data.onHold.count} affiliate(s) is on hold until ops reactivates them.`
+                      : null}{' '}
                     <Link href="/payouts" className="inline-arrow">
                       Go to payouts <Icon name="arrowRight" size={14} />
                     </Link>
