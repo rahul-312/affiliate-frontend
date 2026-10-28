@@ -2,7 +2,7 @@
 
 export type Role = 'affiliate' | 'ops' | 'finance';
 export type StaffRole = Exclude<Role, 'affiliate'>;
-export type UserStatus = 'pending' | 'active' | 'rejected';
+export type UserStatus = 'pending' | 'active' | 'rejected' | 'deactivated';
 export type CommissionStatus = 'pending' | 'approved' | 'rejected' | 'processing' | 'paid';
 export type BatchStatus = 'draft' | 'exported' | 'paid' | 'closed_with_failures' | 'cancelled';
 export type BatchItemStatus = 'pending' | 'paid' | 'failed';
@@ -23,7 +23,12 @@ export interface User {
   promotionChannel?: string | null;
   promotionUrl?: string | null;
   rejectionReason?: string | null;
+  deactivationReason?: string | null;
+  /** Who paused the account: the affiliate themselves or ops. */
+  deactivatedBy?: 'affiliate' | 'ops' | null;
   approvedAt?: string | null;
+  /** Set at approval; null for pending affiliates and for those approved before per-affiliate rates. */
+  commissionRateBps?: number | null;
   referralCode?: string | null;
   referralLinkActive?: boolean;
   referralLink?: string | null;

@@ -6,6 +6,7 @@ const TONES: Record<string, Tone> = {
   pending: 'warning',
   active: 'success',
   rejected: 'danger',
+  deactivated: 'neutral',
   approved: 'info',
   processing: 'info',
   paid: 'success',

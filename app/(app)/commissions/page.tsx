@@ -23,15 +23,25 @@ type Decision = { kind: 'approve' | 'reject'; ids: string[] };
 export default function CommissionsPage() {
   const { role } = useAuth();
   const isOps = role === 'ops';
-  const [status, setStatus] = useState<CommissionStatus | 'all'>(isOps ? 'pending' : 'approved');
+  const [chosenStatus, setStatus] = useState<CommissionStatus | 'all' | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [decision, setDecision] = useState<Decision | null>(null);
   const [simulating, setSimulating] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
-  const { data, error, loading, reload } = useApi(
-    `commissions:${status}`,
-    () => apiRequest<Paginated<Commission>>('/admin/commissions', { query: { status: status === 'all' ? undefined : status, limit: 200 } }),
+  // Open on the role's to-do tab (ops: pending review, finance: approved and ready to pay) only when it has
+  // something in it; otherwise show everything.
+  const focusStatus: CommissionStatus = isOps ? 'pending' : 'approved';
+  const focusCheck = useApi(`commissions:${focusStatus}-count`, () =>
+    apiRequest<Paginated<Commission>>('/admin/commissions', { query: { status: focusStatus, limit: 1 } }),
+  );
+  const defaultStatus = focusCheck.data ? (focusCheck.data.total > 0 ? focusStatus : 'all') : focusCheck.error ? 'all' : null;
+  const status = chosenStatus ?? defaultStatus;
+
+  const { data, error, loading, reload } = useApi(`commissions:${status ?? 'deciding'}`, () =>
+    status === null
+      ? Promise.resolve(null)
+      : apiRequest<Paginated<Commission>>('/admin/commissions', { query: { status: status === 'all' ? undefined : status, limit: 200 } }),
   );
 
   const rows = data?.items ?? null;
@@ -147,7 +157,7 @@ export default function CommissionsPage() {
       />
       {message ? <Notice tone="success">{message}</Notice> : null}
       {error ? <Notice tone="error">{error}</Notice> : null}
-      <StatusTabs label="Filter by status" options={STATUSES} value={status} onChange={changeStatus} />
+      {status !== null ? <StatusTabs label="Filter by status" options={STATUSES} value={status} onChange={changeStatus} /> : null}
       <div className="card">
         {isOps && selected.size > 0 ? (
           <div className="toolbar">
@@ -160,7 +170,7 @@ export default function CommissionsPage() {
             </button>
           </div>
         ) : null}
-        <DataTable columns={columns} rows={rows} rowKey={(c) => c.id} loading={loading} emptyMessage="No commissions in this view." />
+        <DataTable columns={columns} rows={rows} rowKey={(c) => c.id} loading={loading || status === null} emptyMessage="No commissions in this view." />
       </div>
 
       {decision ? (
