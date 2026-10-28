@@ -2,7 +2,7 @@
 
 export type Role = 'affiliate' | 'ops' | 'finance';
 export type StaffRole = Exclude<Role, 'affiliate'>;
-export type UserStatus = 'pending' | 'active' | 'rejected';
+export type UserStatus = 'pending' | 'active' | 'rejected' | 'deactivated';
 export type CommissionStatus = 'pending' | 'approved' | 'rejected' | 'processing' | 'paid';
 export type BatchStatus = 'draft' | 'exported' | 'paid' | 'closed_with_failures' | 'cancelled';
 export type BatchItemStatus = 'pending' | 'paid' | 'failed';
@@ -23,7 +23,12 @@ export interface User {
   promotionChannel?: string | null;
   promotionUrl?: string | null;
   rejectionReason?: string | null;
+  deactivationReason?: string | null;
+  /** Who paused the account: the affiliate themselves or ops. */
+  deactivatedBy?: 'affiliate' | 'ops' | null;
   approvedAt?: string | null;
+  /** Set at approval; null for pending affiliates and for those approved before per-affiliate rates. */
+  commissionRateBps?: number | null;
   referralCode?: string | null;
   referralLinkActive?: boolean;
   referralLink?: string | null;
@@ -58,6 +63,10 @@ export interface BatchItem {
   commissionCount: number;
   status: BatchItemStatus;
   failureReason: string | null;
+  /** Ops deactivated this affiliate after the batch was created: don't pay them from this batch. */
+  onHold?: boolean;
+  /** A CSV download left this affiliate out (they were on hold then); confirm must say whether they were paid. */
+  excludedFromExport?: boolean;
 }
 
 export interface PayoutBatch {
@@ -100,6 +109,8 @@ export interface OverviewStats {
   paidThisMonthPaise: number;
   readyForPayoutPaise: number;
   missingPayoutDetailsCount: number;
+  /** Approved earnings held because ops deactivated the affiliate. */
+  onHold: { count: number; amountPaise: number };
   openBatch: { id: string; batchNo: string; status: BatchStatus; originalTotalPaise: number } | null;
 }
 

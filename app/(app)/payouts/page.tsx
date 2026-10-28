@@ -36,13 +36,14 @@ export default function PayoutsPage() {
     setCreating(true);
     setCreateError(null);
     try {
-      const result = await apiRequest<{ batch: PayoutBatch }>('/admin/payouts', { method: 'POST' });
-      router.push(`/payouts/${result.batch.id}`);
+      const result = await apiRequest<{ batch: PayoutBatch; skipped?: { onHold?: unknown[] } }>('/admin/payouts', { method: 'POST' });
+      const held = result.skipped?.onHold?.length ?? 0;
+      router.push(`/payouts/${result.batch.id}${held ? `?onHold=${held}` : ''}`);
     } catch (err) {
       if (err instanceof ApiError && err.code === 'NOTHING_TO_PAY') {
-        const d = err.details as { skippedMissingDetails?: number; skippedBelowMinimum?: number } | undefined;
+        const d = err.details as { skippedMissingDetails?: number; skippedBelowMinimum?: number; skippedOnHold?: number } | undefined;
         setCreateError(
-          `No commissions are ready for payout. Skipped: ${d?.skippedMissingDetails ?? 0} affiliate(s) without payout details, ${d?.skippedBelowMinimum ?? 0} below the minimum.`,
+          `No commissions are ready for payout. Skipped: ${d?.skippedMissingDetails ?? 0} affiliate(s) without payout details, ${d?.skippedBelowMinimum ?? 0} below the minimum${d?.skippedOnHold ? `, ${d.skippedOnHold} on hold (deactivated by ops)` : ''}.`,
         );
       } else {
         setCreateError(errorMessage(err));

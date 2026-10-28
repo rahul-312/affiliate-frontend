@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { use, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { use, useEffect, useState } from 'react';
 import { apiDownload, apiRequest, errorMessage } from '@/lib/api';
 import { formatDateTime } from '@/lib/format';
 import { formatPaise } from '@/lib/money';
@@ -30,7 +31,19 @@ const itemColumns = (showReason: boolean): Column<BatchItem>[] => [
   { key: 'count', header: 'Commissions', numeric: true, render: (i) => i.commissionCount },
   { key: 'amount', header: 'Amount', numeric: true, render: (i) => <strong>{formatPaise(i.amountPaise)}</strong> },
   ...(showReason ? [{ key: 'reason', header: 'Reason', render: (i: BatchItem) => i.failureReason ?? '—' }] : []),
-  { key: 'status', header: 'Status', render: (i) => <StatusBadge status={i.status} /> },
+  {
+    key: 'status',
+    header: 'Status',
+    render: (i) => (
+      <>
+        <StatusBadge status={i.status} />
+        {i.onHold && i.status === 'pending' ? <div className="sub">On hold: deactivated by ops</div> : null}
+        {!i.onHold && i.excludedFromExport && i.status === 'pending' ? (
+          <div className="sub">Left out of a CSV download: confirm whether it was paid</div>
+        ) : null}
+      </>
+    ),
+  },
 ];
 
 export default function PayoutBatchPage({ params }: { params: Promise<{ id: string }> }) {
@@ -39,6 +52,15 @@ export default function PayoutBatchPage({ params }: { params: Promise<{ id: stri
   const [cancelling, setCancelling] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [message, setMessage] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
+
+  // Set by the payouts page when batch creation left out affiliates whose payouts are on hold.
+  // Read once, then removed from the URL so a refresh or a shared link doesn't show a stale count.
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const [skippedOnHold] = useState(() => Number(searchParams.get('onHold') ?? 0));
+  useEffect(() => {
+    if (searchParams.has('onHold')) router.replace(`/payouts/${encodeURIComponent(id)}`, { scroll: false });
+  }, [searchParams, router, id]);
 
   const { data: batch, error, reload } = useApi(`batch:${id}`, () =>
     apiRequest<PayoutBatch>(`/admin/payouts/${encodeURIComponent(id)}`),
@@ -67,6 +89,8 @@ export default function PayoutBatchPage({ params }: { params: Promise<{ id: stri
   const isClosed = batch.status === 'paid' || batch.status === 'closed_with_failures';
   const paidItems = items.filter((i) => i.status === 'paid');
   const failedItems = items.filter((i) => i.status === 'failed');
+  const heldItems = isOpen ? items.filter((i) => i.onHold && i.status === 'pending') : [];
+  const heldNames = heldItems.map((i) => i.affiliate.name ?? i.affiliate.id).join(', ');
 
   return (
     <>
@@ -105,6 +129,18 @@ export default function PayoutBatchPage({ params }: { params: Promise<{ id: stri
           ) : null
         }
       />
+      {skippedOnHold > 0 ? (
+        <Notice tone="info">
+          {skippedOnHold} affiliate(s) with approved earnings were left out because their payouts are on hold (deactivated by ops).
+        </Notice>
+      ) : null}
+      {heldItems.length > 0 ? (
+        <Notice tone="warning">
+          {batch.status === 'draft'
+            ? `Payouts are now on hold for ${heldNames}. Cancel this draft and create a new batch; held affiliates are left out automatically.`
+            : `Payouts are now on hold for ${heldNames}. If their transfer hasn't gone out yet, don't send it. When you confirm, say whether the bank already paid them. A re-downloaded CSV leaves them out.`}
+        </Notice>
+      ) : null}
       {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
       {batch.status === 'draft' ? (
         <Notice tone="info">Step 1: download the CSV and upload it to the bank. Downloading does not mark anything as paid.</Notice>
@@ -159,7 +195,9 @@ export default function PayoutBatchPage({ params }: { params: Promise<{ id: stri
         </div>
       )}
 
-      {confirming ? <ConfirmPayoutDialog batch={batch} onClose={() => setConfirming(false)} onConfirmed={reload} /> : null}
+      {confirming ? (
+        <ConfirmPayoutDialog batch={batch} onClose={() => setConfirming(false)} onConfirmed={reload} onRefresh={reload} />
+      ) : null}
       {cancelling ? (
         <ConfirmDialog
           title={`Cancel ${batch.batchNo}?`}
