@@ -10,8 +10,10 @@ import type { BatchItem, PayoutBatch } from '@/lib/types';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { ConfirmPayoutDialog } from '@/components/ConfirmPayoutDialog';
 import { DataTable, type Column } from '@/components/DataTable';
+import { Icon } from '@/components/Icon';
 import { Notice } from '@/components/Notice';
 import { PageHeader } from '@/components/PageHeader';
+import { StatCard } from '@/components/StatCard';
 import { StatusBadge } from '@/components/StatusBadge';
 
 const itemColumns = (showReason: boolean): Column<BatchItem>[] => [
@@ -68,21 +70,25 @@ export default function PayoutBatchPage({ params }: { params: Promise<{ id: stri
 
   return (
     <>
-      <p style={{ margin: '0 0 8px' }}>
-        <Link href="/payouts">← All payouts</Link>
-      </p>
+      <Link href="/payouts" className="back-link">
+        <Icon name="arrowLeft" size={14} />
+        All payouts
+      </Link>
       <PageHeader
         title={`Payout ${batch.batchNo}`}
+        eyebrow="Payouts"
         subtitle={<StatusBadge status={batch.status} />}
         actions={
           isOpen ? (
             <>
               {batch.status === 'draft' ? (
                 <button type="button" className="btn btn-danger" onClick={() => setCancelling(true)}>
+                  <Icon name="x" size={16} />
                   Cancel batch
                 </button>
               ) : null}
               <button type="button" className="btn" onClick={download} disabled={downloading}>
+                <Icon name="download" size={16} />
                 {downloading ? 'Preparing…' : batch.status === 'draft' ? 'Download CSV' : 'Download CSV again'}
               </button>
               <button
@@ -92,6 +98,7 @@ export default function PayoutBatchPage({ params }: { params: Promise<{ id: stri
                 disabled={batch.status !== 'exported'}
                 title={batch.status !== 'exported' ? 'Download the CSV and send the payments first' : undefined}
               >
+                <Icon name="check" size={16} />
                 Confirm payment
               </button>
             </>
@@ -116,9 +123,9 @@ export default function PayoutBatchPage({ params }: { params: Promise<{ id: stri
       ) : null}
 
       <div className="stats">
-        <div className="card"><div className="card-body"><div className="stat-label">Batch total</div><div className="stat-value">{formatPaise(batch.originalTotalPaise)}</div></div></div>
-        <div className="card"><div className="card-body"><div className="stat-label">Paid</div><div className="stat-value">{formatPaise(batch.paidPaise)}</div></div></div>
-        <div className="card"><div className="card-body"><div className="stat-label">Failed</div><div className="stat-value">{formatPaise(batch.failedPaise)}</div></div></div>
+        <StatCard label="Batch total" value={formatPaise(batch.originalTotalPaise)} icon="layers" variant={0} />
+        <StatCard label="Paid" value={formatPaise(batch.paidPaise)} icon="check" variant={1} />
+        <StatCard label="Failed" value={formatPaise(batch.failedPaise)} icon="alert" variant={2} />
         <div className="card">
           <div className="card-body">
             <dl className="kv">
