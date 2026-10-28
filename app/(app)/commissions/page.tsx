@@ -5,7 +5,7 @@ import { apiRequest } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { formatDateTime } from '@/lib/format';
 import { formatBps, formatPaise } from '@/lib/money';
-import { useApi } from '@/lib/useApi';
+import { useFocusedList } from '@/lib/useFocusedList';
 import type { Commission, CommissionStatus, Paginated } from '@/lib/types';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { DataTable, type Column } from '@/components/DataTable';
@@ -23,16 +23,19 @@ type Decision = { kind: 'approve' | 'reject'; ids: string[] };
 export default function CommissionsPage() {
   const { role } = useAuth();
   const isOps = role === 'ops';
-  const [status, setStatus] = useState<CommissionStatus | 'all'>(isOps ? 'pending' : 'approved');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [decision, setDecision] = useState<Decision | null>(null);
   const [simulating, setSimulating] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
-  const { data, error, loading, reload } = useApi(
-    `commissions:${status}`,
-    () => apiRequest<Paginated<Commission>>('/admin/commissions', { query: { status: status === 'all' ? undefined : status, limit: 200 } }),
-  );
+  // Open on the role's to-do tab (ops: pending review, finance: approved and ready to pay) only when it has
+  // something in it; otherwise on All.
+  const { status, setStatus, data, error, loading, reload, focusCheckFailed } = useFocusedList<CommissionStatus, Commission>({
+    name: 'commissions',
+    focus: isOps ? 'pending' : 'approved',
+    fetchList: (s) =>
+      apiRequest<Paginated<Commission>>('/admin/commissions', { query: { status: s === 'all' ? undefined : s, limit: 200 } }),
+  });
 
   const rows = data?.items ?? null;
   const selectable = (rows ?? []).filter((c) => c.status === 'pending');
@@ -147,6 +150,9 @@ export default function CommissionsPage() {
       />
       {message ? <Notice tone="success">{message}</Notice> : null}
       {error ? <Notice tone="error">{error}</Notice> : null}
+      {focusCheckFailed ? (
+        <Notice tone="info">Couldn&apos;t check for {isOps ? 'commissions awaiting review' : 'approved commissions'}, so this shows all commissions.</Notice>
+      ) : null}
       <StatusTabs label="Filter by status" options={STATUSES} value={status} onChange={changeStatus} />
       <div className="card">
         {isOps && selected.size > 0 ? (

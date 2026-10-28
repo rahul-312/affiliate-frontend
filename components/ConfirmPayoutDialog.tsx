@@ -1,9 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { apiRequest, errorMessage } from '@/lib/api';
+import { ApiError, apiRequest, errorMessage } from '@/lib/api';
 import { formatPaise } from '@/lib/money';
-import type { PayoutBatch } from '@/lib/types';
+import type { BatchItem, PayoutBatch } from '@/lib/types';
 import { Dialog } from './Dialog';
 import { Notice } from './Notice';
 
@@ -11,26 +11,71 @@ interface ConfirmPayoutDialogProps {
   batch: PayoutBatch;
   onClose: () => void;
   onConfirmed: () => void;
+  /** Reloads the batch; used when the server says a hold changed while the dialog was open. */
+  onRefresh: () => Promise<void>;
 }
 
 const REFERENCE_PATTERN = /^[A-Za-z0-9\-_/]{4,64}$/;
+
+const HELD_FAILURE_REASON = 'Payout on hold: affiliate deactivated by ops';
+const EXCLUDED_FAILURE_REASON = 'Left out of the CSV sent to the bank';
+
+/** Items the server can't settle on its own: on hold now, or left out of a CSV download. */
+const needsDecision = (item: BatchItem) => Boolean(item.onHold || item.excludedFromExport);
+
+const PREFILLED_REASONS = new Set([HELD_FAILURE_REASON, EXCLUDED_FAILURE_REASON]);
+
+/**
+ * A reason we pre-filled describes the item's situation when it was answered. If a refresh changed
+ * that situation (e.g. the hold was lifted), swap in the matching text, or clear it so finance writes
+ * one; a reason finance typed is always kept.
+ */
+function effectiveReason(item: BatchItem | undefined, raw: string) {
+  if (!item || !PREFILLED_REASONS.has(raw)) return raw;
+  if (item.onHold) return HELD_FAILURE_REASON;
+  if (item.excludedFromExport) return EXCLUDED_FAILURE_REASON;
+  return '';
+}
 
 /**
  * Finance confirms the bank transfer with its reference. Any affiliate whose
  * transfer failed is ticked with a reason; their commissions return to
  * "approved" and are retried in the next batch.
+ *
+ * An affiliate on hold, or left out of a CSV download, needs an explicit
+ * answer, because only finance knows whether the bank already sent it:
+ * "sent" records it as paid (so it is never paid twice), "not sent" marks it
+ * failed (held money stays held; otherwise it is retried next batch).
  */
-export function ConfirmPayoutDialog({ batch, onClose, onConfirmed }: ConfirmPayoutDialogProps) {
+export function ConfirmPayoutDialog({ batch, onClose, onConfirmed, onRefresh }: ConfirmPayoutDialogProps) {
   const items = batch.items ?? [];
   const [reference, setReference] = useState('');
   const [failed, setFailed] = useState<Record<string, string>>({});
+  const [heldSent, setHeldSent] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const failedIds = Object.keys(failed);
   const failedTotal = items.filter((i) => failedIds.includes(i.affiliate.id)).reduce((sum, i) => sum + i.amountPaise, 0);
   const referenceValid = REFERENCE_PATTERN.test(reference.trim());
-  const reasonsValid = failedIds.every((id) => (failed[id] ?? '').trim().length >= 3);
+  const reasonOf = (affiliateId: string) =>
+    effectiveReason(items.find((i) => i.affiliate.id === affiliateId), failed[affiliateId] ?? '');
+  const reasonsValid = failedIds.every((id) => reasonOf(id).trim().length >= 3);
+  const decisionItems = items.filter(needsDecision);
+  const heldDecided = decisionItems.every((i) => i.affiliate.id in heldSent);
+  // Held money answered "not sent" isn't retried until ops reactivates the affiliate, so it's shown separately.
+  const onHoldTotal = items.filter((i) => i.onHold && heldSent[i.affiliate.id] === false).reduce((sum, i) => sum + i.amountPaise, 0);
+
+  const decideHeld = (item: BatchItem, sent: boolean) => {
+    const affiliateId = item.affiliate.id;
+    setHeldSent((current) => ({ ...current, [affiliateId]: sent }));
+    setFailed((current) => {
+      const next = { ...current };
+      if (sent) delete next[affiliateId];
+      else next[affiliateId] = current[affiliateId] ?? (item.onHold ? HELD_FAILURE_REASON : EXCLUDED_FAILURE_REASON);
+      return next;
+    });
+  };
 
   const toggle = (affiliateId: string) =>
     setFailed((current) => {
@@ -48,13 +93,20 @@ export function ConfirmPayoutDialog({ batch, onClose, onConfirmed }: ConfirmPayo
         method: 'POST',
         body: {
           paymentReference: reference.trim(),
-          failedItems: failedIds.map((affiliateId) => ({ affiliateId, reason: (failed[affiliateId] ?? '').trim() })),
+          failedItems: failedIds.map((affiliateId) => ({ affiliateId, reason: reasonOf(affiliateId).trim() })),
+          heldPaidAcknowledged: decisionItems.map((i) => i.affiliate.id).filter((affiliateId) => heldSent[affiliateId]),
         },
       });
       onConfirmed();
       onClose();
     } catch (err) {
-      setError(errorMessage(err));
+      // A hold started or ended while the dialog was open: reload so the questions match the server.
+      if (err instanceof ApiError && (err.code === 'PAYOUT_ON_HOLD' || err.code === 'BAD_REQUEST')) {
+        await onRefresh();
+        setError(`${errorMessage(err)} The batch has been refreshed: check the questions below and confirm again.`);
+      } else {
+        setError(errorMessage(err));
+      }
       setBusy(false);
     }
   };
@@ -69,7 +121,7 @@ export function ConfirmPayoutDialog({ batch, onClose, onConfirmed }: ConfirmPayo
           <button type="button" className="btn" onClick={onClose} disabled={busy}>
             Cancel
           </button>
-          <button type="button" className="btn btn-primary" onClick={submit} disabled={busy || !referenceValid || !reasonsValid}>
+          <button type="button" className="btn btn-primary" onClick={submit} disabled={busy || !referenceValid || !reasonsValid || !heldDecided}>
             {busy ? 'Confirming…' : failedIds.length ? `Confirm, ${failedIds.length} failed` : 'Confirm all paid'}
           </button>
         </>
@@ -96,6 +148,48 @@ export function ConfirmPayoutDialog({ batch, onClose, onConfirmed }: ConfirmPayo
       </div>
       {items.map((item) => {
         const isFailed = item.affiliate.id in failed;
+        if (needsDecision(item)) {
+          const id = item.affiliate.id;
+          const name = item.affiliate.name ?? id;
+          const why = item.onHold
+            ? 'on hold: deactivated by ops after the CSV was downloaded'
+            : 'left out of a CSV download because their payout was on hold at the time';
+          return (
+            <div key={id} className="card" style={{ marginBottom: 8 }}>
+              <div className="card-body" style={{ padding: '10px 14px' }}>
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                  <span style={{ flex: 1 }}>
+                    <strong>{name}</strong>
+                    <span className="sub"> · {why}</span>
+                  </span>
+                  <strong className="mono">{formatPaise(item.amountPaise)}</strong>
+                </div>
+                <fieldset style={{ border: 0, padding: 0, margin: '8px 0 0' }}>
+                  <legend className="hint">Did the bank already send this transfer?</legend>
+                  <label style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer' }}>
+                    <input type="radio" name={`held-${id}`} checked={heldSent[id] === true} onChange={() => decideHeld(item, true)} />
+                    Yes, it went out: record it as paid
+                  </label>
+                  <label style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer' }}>
+                    <input type="radio" name={`held-${id}`} checked={heldSent[id] === false} onChange={() => decideHeld(item, false)} />
+                    {item.onHold ? 'No: mark it failed and keep the money on hold' : 'No: mark it failed so it is paid in the next batch'}
+                  </label>
+                </fieldset>
+                {heldSent[id] === false ? (
+                  <input
+                    className="input"
+                    style={{ marginTop: 8 }}
+                    placeholder="Reason, at least 3 characters"
+                    value={reasonOf(id)}
+                    maxLength={500}
+                    onChange={(e) => setFailed((current) => ({ ...current, [id]: e.target.value }))}
+                    aria-label={`Failure reason for ${name}`}
+                  />
+                ) : null}
+              </div>
+            </div>
+          );
+        }
         return (
           <div key={item.affiliate.id} className="card" style={{ marginBottom: 8 }}>
             <div className="card-body" style={{ padding: '10px 14px' }}>
@@ -112,7 +206,7 @@ export function ConfirmPayoutDialog({ batch, onClose, onConfirmed }: ConfirmPayo
                   className="input"
                   style={{ marginTop: 8 }}
                   placeholder="Reason, e.g. account closed"
-                  value={failed[item.affiliate.id]}
+                  value={reasonOf(item.affiliate.id)}
                   maxLength={500}
                   onChange={(e) => setFailed((current) => ({ ...current, [item.affiliate.id]: e.target.value }))}
                   aria-label={`Failure reason for ${item.affiliate.name ?? item.affiliate.id}`}
@@ -129,7 +223,13 @@ export function ConfirmPayoutDialog({ batch, onClose, onConfirmed }: ConfirmPayo
         <dt>Marked paid</dt>
         <dd>{formatPaise(batch.originalTotalPaise - failedTotal)}</dd>
         <dt>Needs another attempt</dt>
-        <dd>{formatPaise(failedTotal)}</dd>
+        <dd>{formatPaise(failedTotal - onHoldTotal)}</dd>
+        {onHoldTotal > 0 ? (
+          <>
+            <dt>On hold until reactivated</dt>
+            <dd>{formatPaise(onHoldTotal)}</dd>
+          </>
+        ) : null}
       </dl>
     </Dialog>
   );
