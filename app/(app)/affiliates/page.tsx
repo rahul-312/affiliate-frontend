@@ -8,6 +8,7 @@ import { useApi } from '@/lib/useApi';
 import type { Paginated, User, UserStatus } from '@/lib/types';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { DataTable, type Column } from '@/components/DataTable';
+import { Icon } from '@/components/Icon';
 import { Notice } from '@/components/Notice';
 import { PageHeader } from '@/components/PageHeader';
 import { StatusBadge } from '@/components/StatusBadge';
@@ -86,11 +87,13 @@ export default function AffiliatesPage() {
       header: '',
       render: (a) =>
         a.status === 'pending' ? (
-          <div style={{ display: 'flex', gap: 6 }}>
+          <div className="row-actions">
             <button type="button" className="btn btn-sm btn-primary" onClick={() => setAction({ kind: 'approve', affiliate: a })}>
+              <Icon name="check" size={14} />
               Approve
             </button>
             <button type="button" className="btn btn-sm btn-danger" onClick={() => setAction({ kind: 'reject', affiliate: a })}>
+              <Icon name="x" size={14} />
               Reject
             </button>
           </div>
@@ -118,7 +121,7 @@ export default function AffiliatesPage() {
           rows={data?.items ?? null}
           rowKey={(a) => a.id}
           loading={loading}
-          emptyMessage={status === 'pending' ? 'No applications waiting. 🎉' : 'No affiliates in this view.'}
+          emptyMessage={status === 'pending' ? 'No applications waiting.' : 'No affiliates in this view.'}
         />
       </div>
 

@@ -6,20 +6,11 @@ import { useAuth } from '@/lib/auth';
 import { formatPaise } from '@/lib/money';
 import { useApi } from '@/lib/useApi';
 import type { OverviewStats } from '@/lib/types';
+import { Icon } from '@/components/Icon';
 import { Notice } from '@/components/Notice';
 import { PageHeader } from '@/components/PageHeader';
+import { StatCard } from '@/components/StatCard';
 import { StatusBadge } from '@/components/StatusBadge';
-
-function Stat({ label, value, hint, href }: { label: string; value: string; hint?: string; href?: string }) {
-  const body = (
-    <div className="card-body">
-      <div className="stat-label">{label}</div>
-      <div className="stat-value">{value}</div>
-      {hint ? <div className="stat-hint">{hint}</div> : null}
-    </div>
-  );
-  return <div className="card">{href ? <Link href={href} style={{ color: 'inherit', textDecoration: 'none' }}>{body}</Link> : body}</div>;
-}
 
 export default function OverviewPage() {
   const { role } = useAuth();
@@ -32,6 +23,7 @@ export default function OverviewPage() {
         subtitle="Where the program stands right now."
         actions={
           <button type="button" className="btn" onClick={reload} disabled={loading}>
+            <Icon name="refresh" size={16} />
             Refresh
           </button>
         }
@@ -42,37 +34,59 @@ export default function OverviewPage() {
       ) : (
         <>
           <div className="stats">
-            <Stat label="New applications" value={String(data.newApplications)} hint="Affiliates waiting for review" href="/affiliates" />
-            <Stat
+            <StatCard
+              label="New applications"
+              value={String(data.newApplications)}
+              hint="Affiliates waiting for review"
+              href="/affiliates"
+              icon="file"
+              variant={0}
+            />
+            <StatCard
               label="Pending commissions"
               value={formatPaise(data.pendingCommissions.amountPaise)}
               hint={`${data.pendingCommissions.count} awaiting review`}
               href="/commissions"
+              icon="clock"
+              variant={1}
             />
-            <Stat
+            <StatCard
               label="Approved, not yet paid"
               value={formatPaise(data.approvedUnpaid.totalPaise)}
               hint={`${formatPaise(data.approvedUnpaid.processingPaise)} in an open payout`}
+              icon="wallet"
+              variant={2}
             />
-            <Stat label="Paid this month" value={formatPaise(data.paidThisMonthPaise)} hint="Confirmed with a payment reference" />
+            <StatCard
+              label="Paid this month"
+              value={formatPaise(data.paidThisMonthPaise)}
+              hint="Confirmed with a payment reference"
+              icon="chart"
+              variant={3}
+            />
           </div>
 
           {role === 'finance' ? (
-            <div className="card">
-              <div className="card-body">
-                <h2 style={{ marginBottom: 8 }}>Next payout run</h2>
+            <div className="card feature-card">
+              <span className="icon-chip">
+                <Icon name="layers" />
+              </span>
+              <div>
+                <h2>Next payout run</h2>
                 {data.openBatch ? (
-                  <p style={{ margin: 0 }}>
+                  <p>
                     <Link href={`/payouts/${data.openBatch.id}`}>{data.openBatch.batchNo}</Link> is open (<StatusBadge status={data.openBatch.status} />) for{' '}
                     {formatPaise(data.openBatch.originalTotalPaise)}. Finish or cancel it before creating another.
                   </p>
                 ) : (
-                  <p style={{ margin: 0 }}>
+                  <p>
                     {formatPaise(data.readyForPayoutPaise)} is ready to batch.{' '}
                     {data.missingPayoutDetailsCount > 0
                       ? `${data.missingPayoutDetailsCount} affiliate(s) can't be paid yet because they haven't added payout details.`
                       : null}{' '}
-                    <Link href="/payouts">Go to payouts →</Link>
+                    <Link href="/payouts" className="inline-arrow">
+                      Go to payouts <Icon name="arrowRight" size={14} />
+                    </Link>
                   </p>
                 )}
               </div>
