@@ -81,16 +81,15 @@ Affiliate accounts can't sign in here. Affiliates use the mobile app.
 | Login fails with a network or CORS error | Check that the backend is running, and that its `CORS_ORIGINS` includes `http://localhost:3000`. Restart the backend after changing it |
 | Login says the email or password is wrong | Run `npm run seed` in the backend to load the demo accounts |
 | Changed `NEXT_PUBLIC_API_URL` but nothing changed | Stop `npm run dev` and start it again |
-| First request takes about 30 seconds against the deployed backend | Render's free tier is waking up. Wait and try again |
 
 ---
 
 ## Deploying to Vercel
 
 1. On Vercel, import this repo.
-2. Before the first deploy, add the environment variable `NEXT_PUBLIC_API_URL=https://<your-backend>.onrender.com/api`.
+2. Before the first deploy, add the environment variable `NEXT_PUBLIC_API_URL=https://<your-backend>.vercel.app/api`.
 3. Deploy.
-4. Copy the dashboard's URL (`https://….vercel.app`) and add it to the backend's `CORS_ORIGINS` on Render.
+4. Copy the dashboard's URL (`https://….vercel.app`) and add it as `CORS_ORIGINS` in the backend's Vercel project, then redeploy the backend.
 
 If you change `NEXT_PUBLIC_API_URL` later, redeploy, because the value is baked in at build time.
 
