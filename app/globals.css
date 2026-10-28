@@ -65,6 +65,7 @@ code { background: var(--surface-muted); padding: 1px 6px; border-radius: 6px; }
   width: 208px; flex-shrink: 0; border-right: 1px solid var(--border);
   padding: 28px 14px 20px; display: flex; flex-direction: column;
 }
+.sidebar-decor { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
 .sidebar-leaf { position: absolute; left: -60px; top: 34%; width: 340px; color: var(--leaf); opacity: var(--leaf-opacity); pointer-events: none; transform: rotate(-30deg); }
 .brand { position: relative; font-family: var(--display); font-size: 21px; padding: 0 12px 26px; }
 .brand small { display: block; font-family: var(--font); font-size: 13px; color: var(--text-muted); margin-top: 2px; }
@@ -99,7 +100,7 @@ code { background: var(--surface-muted); padding: 1px 6px; border-radius: 6px; }
 @media (max-width: 860px) {
   .shell { flex-direction: column; }
   .sidebar { position: relative; height: auto; width: 100%; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 8px; padding: 14px 16px; border-right: 0; border-bottom: 1px solid var(--border); }
-  .sidebar-leaf { display: none; }
+  .sidebar-decor { display: none; }
   .brand { padding: 0 12px 0 0; font-size: 19px; }
   .brand small { display: none; }
   .nav-list { flex-direction: row; flex-wrap: wrap; order: 3; width: 100%; }

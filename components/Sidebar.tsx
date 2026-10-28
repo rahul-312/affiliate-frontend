@@ -23,7 +23,9 @@ export function Sidebar() {
 
   return (
     <nav className="sidebar" aria-label="Main">
-      <LeafShadow className="sidebar-leaf" />
+      <div className="sidebar-decor">
+        <LeafShadow className="sidebar-leaf" />
+      </div>
       <div className="brand">
         Affiliate Hub
         <small>{role === 'ops' ? 'Affiliate team' : 'Finance team'}</small>
