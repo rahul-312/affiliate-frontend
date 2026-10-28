@@ -40,9 +40,9 @@ export default function PayoutsPage() {
       router.push(`/payouts/${result.batch.id}`);
     } catch (err) {
       if (err instanceof ApiError && err.code === 'NOTHING_TO_PAY') {
-        const d = err.details as { skippedMissingDetails?: number; skippedBelowMinimum?: number } | undefined;
+        const d = err.details as { skippedMissingDetails?: number; skippedBelowMinimum?: number; skippedOnHold?: number } | undefined;
         setCreateError(
-          `No commissions are ready for payout. Skipped: ${d?.skippedMissingDetails ?? 0} affiliate(s) without payout details, ${d?.skippedBelowMinimum ?? 0} below the minimum.`,
+          `No commissions are ready for payout. Skipped: ${d?.skippedMissingDetails ?? 0} affiliate(s) without payout details, ${d?.skippedBelowMinimum ?? 0} below the minimum${d?.skippedOnHold ? `, ${d.skippedOnHold} on hold (deactivated by ops)` : ''}.`,
         );
       } else {
         setCreateError(errorMessage(err));

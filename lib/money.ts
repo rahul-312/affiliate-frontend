@@ -30,11 +30,12 @@ export const MIN_RATE_BPS = 100;
 export const MAX_RATE_BPS = 5000;
 
 /**
- * Parses a percentage typed by a person ("12", "12.5", "12.25%") into whole
+ * Parses a percentage typed by a person ("12", "12.5", "12,5", "12.25%") into whole
  * basis points. Returns null unless it is within MIN_RATE_BPS–MAX_RATE_BPS.
  */
 export function percentToBps(input: string): number | null {
-  const match = /^(\d{1,2})(?:\.(\d{1,2}))?$/.exec(input.replace(/[%\s]/g, ''));
+  // A comma is accepted as the decimal separator too ("12,5").
+  const match = /^(\d{1,2})(?:[.,](\d{1,2}))?$/.exec(input.replace(/[%\s]/g, ''));
   if (!match) return null;
   const bps = Number(match[1]) * 100 + Number((match[2] ?? '').padEnd(2, '0'));
   return bps >= MIN_RATE_BPS && bps <= MAX_RATE_BPS ? bps : null;

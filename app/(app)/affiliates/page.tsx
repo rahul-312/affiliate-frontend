@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth';
 import { formatDate, humanize } from '@/lib/format';
 import { formatBps } from '@/lib/money';
 import { useApi } from '@/lib/useApi';
+import { useFocusedList } from '@/lib/useFocusedList';
 import type { Paginated, User, UserStatus } from '@/lib/types';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { DataTable, type Column } from '@/components/DataTable';
@@ -36,24 +37,18 @@ function SafeLink({ url }: { url: string | null | undefined }) {
 export default function AffiliatesPage() {
   const { role } = useAuth();
   const isOps = role === 'ops';
-  const [chosenStatus, setStatus] = useState<UserStatus | 'all' | null>(null);
   const [action, setAction] = useState<PendingAction | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
-  // Open on Pending only when there are applications to review; otherwise show everyone.
-  const pendingCheck = useApi('affiliates:pending-count', () =>
-    apiRequest<Paginated<User>>('/admin/affiliates', { query: { status: 'pending', limit: 1 } }),
-  );
-  const defaultStatus = pendingCheck.data ? (pendingCheck.data.total > 0 ? 'pending' : 'all') : pendingCheck.error ? 'all' : null;
-  const status = chosenStatus ?? defaultStatus;
-
-  const { data, error, loading, reload } = useApi(`affiliates:${status ?? 'deciding'}`, () =>
-    status === null
-      ? Promise.resolve(null)
-      : apiRequest<Paginated<User>>('/admin/affiliates', { query: { status: status === 'all' ? undefined : status, limit: 100 } }),
-  );
+  // Opens on Pending only when there are applications to review; otherwise on All.
+  const { status, setStatus, data, error, loading, reload, focusCheckFailed } = useFocusedList<UserStatus, User>({
+    name: 'affiliates',
+    focus: 'pending',
+    fetchList: (s) => apiRequest<Paginated<User>>('/admin/affiliates', { query: { status: s === 'all' ? undefined : s, limit: 100 } }),
+  });
 
   // The standard rate: the default when approving, and the rate for affiliates approved before per-affiliate rates.
+  // Approving doesn't depend on it: without it the dialog starts empty and the server applies the standard rate.
   const program = useApi('program', () => apiRequest<{ rateBps: number }>('/program'));
   const standardBps = program.data?.rateBps ?? null;
   const rateOf = (a: User) => a.commissionRateBps ?? standardBps;
@@ -118,13 +113,7 @@ export default function AffiliatesPage() {
       render: (a) =>
         a.status === 'pending' ? (
           <div className="row-actions">
-            <button
-              type="button"
-              className="btn btn-sm btn-primary"
-              onClick={() => setAction({ kind: 'approve', affiliate: a })}
-              disabled={standardBps === null}
-              title={standardBps === null ? 'Loading the standard rate…' : undefined}
-            >
+            <button type="button" className="btn btn-sm btn-primary" onClick={() => setAction({ kind: 'approve', affiliate: a })}>
               <Icon name="check" size={14} />
               Approve
             </button>
@@ -150,6 +139,17 @@ export default function AffiliatesPage() {
               <Icon name="refresh" size={14} />
               Reactivate
             </button>
+            {rateOf(a) !== null ? (
+              <button type="button" className="btn btn-sm" onClick={() => setAction({ kind: 'rate', affiliate: a })}>
+                Edit rate
+              </button>
+            ) : null}
+            {/* Ops can take over a self-pause so the affiliate can't resume it, e.g. when a review starts. */}
+            {a.deactivatedBy === 'affiliate' ? (
+              <button type="button" className="btn btn-sm btn-danger" onClick={() => setAction({ kind: 'deactivate', affiliate: a })}>
+                Deactivate
+              </button>
+            ) : null}
           </div>
         ) : null,
     });
@@ -161,21 +161,25 @@ export default function AffiliatesPage() {
     await reload();
   };
 
-  const approve = async (affiliate: User, rateBps: number) => {
-    await apiRequest(`/admin/affiliates/${affiliate.id}/approve`, { method: 'POST', body: { rateBps } });
-    setMessage(`${affiliate.name} is approved at ${formatBps(rateBps)}. Their referral link is now live.`);
+  const approve = async (affiliate: User, rateBps: number | null) => {
+    const approved = await apiRequest<User>(`/admin/affiliates/${affiliate.id}/approve`, {
+      method: 'POST',
+      body: rateBps === null ? {} : { rateBps },
+    });
+    const rate = approved.commissionRateBps ?? rateBps;
+    setMessage(`${affiliate.name} is approved${rate !== null ? ` at ${formatBps(rate)}` : ''}. Their referral link is now live.`);
     await reload();
   };
 
-  const setActive = async (affiliate: User, active: boolean, reason?: string) => {
+  const setActive = async (affiliate: User, active: boolean, text: string) => {
     await apiRequest(`/admin/affiliates/${affiliate.id}/${active ? 'reactivate' : 'deactivate'}`, {
       method: 'POST',
-      body: active ? {} : { reason },
+      body: active ? (text ? { note: text } : {}) : { reason: text },
     });
     setMessage(
       active
         ? `${affiliate.name} is active again. Their referral link is live.`
-        : `${affiliate.name} is deactivated. Their link is off and new sales won't earn commission.`,
+        : `${affiliate.name} is deactivated. Their link is off, new sales won't earn commission and their payouts are on hold.`,
     );
     await reload();
   };
@@ -191,13 +195,22 @@ export default function AffiliatesPage() {
       <PageHeader title="Affiliates" subtitle={isOps ? 'Review applications. Approval activates the referral link.' : 'Read-only view of the affiliate roster.'} />
       {message ? <Notice tone="success">{message}</Notice> : null}
       {error ? <Notice tone="error">{error}</Notice> : null}
-      {status !== null ? <StatusTabs label="Filter by status" options={STATUSES} value={status} onChange={setStatus} /> : null}
+      {isOps && program.error ? (
+        <Notice tone="error">
+          Couldn&apos;t load the standard rate, so the approval form starts empty (leaving it empty applies the standard rate).{' '}
+          <button type="button" className="btn btn-sm" onClick={() => void program.reload()}>
+            Try again
+          </button>
+        </Notice>
+      ) : null}
+      {focusCheckFailed ? <Notice tone="info">Couldn&apos;t check for pending applications, so this shows all affiliates.</Notice> : null}
+      <StatusTabs label="Filter by status" options={STATUSES} value={status} onChange={setStatus} />
       <div className="card">
         <DataTable
           columns={columns}
           rows={data?.items ?? null}
           rowKey={(a) => a.id}
-          loading={loading || status === null}
+          loading={loading}
           emptyMessage={status === 'pending' ? 'No applications waiting.' : 'No affiliates in this view.'}
         />
       </div>
@@ -217,46 +230,83 @@ export default function AffiliatesPage() {
       {action?.kind === 'deactivate' ? (
         <ConfirmDialog
           title={`Deactivate ${action.affiliate.name}?`}
-          description="Their referral link stops working and new sales won't earn commission. Commissions already earned can still be approved and paid. They'll see the reason in the app and can't undo this themselves."
+          description={
+            action.affiliate.deactivatedBy === 'affiliate'
+              ? 'They paused their account themselves. Deactivating it means only ops can bring it back, and holds their payouts until then. The affiliate sees this reason in the app, so keep internal notes out of it.'
+              : "Their referral link stops working, new sales won't earn commission and their payouts are held until you reactivate them. Commissions can still be reviewed. The affiliate sees this reason in the app, so keep internal notes out of it."
+          }
           confirmLabel="Deactivate"
           danger
-          reasonLabel="Reason"
+          reasonLabel="Reason (shown to the affiliate)"
           reasonRequired
           onConfirm={(reason) => setActive(action.affiliate, false, reason)}
           onClose={() => setAction(null)}
         />
       ) : null}
-      {action?.kind === 'reactivate' ? (
-        <ConfirmDialog
-          title={`Reactivate ${action.affiliate.name}?`}
-          description={`Their referral link goes live again${
-            rateOf(action.affiliate) !== null ? ` at their ${formatBps(rateOf(action.affiliate) as number)} rate` : ''
-          }.`}
-          confirmLabel="Reactivate"
-          onConfirm={() => setActive(action.affiliate, true)}
-          onClose={() => setAction(null)}
-        />
-      ) : null}
-      {action?.kind === 'approve' && standardBps !== null ? (
+      {action?.kind === 'reactivate' ? <ReactivateDialog affiliate={action.affiliate} rateBps={rateOf(action.affiliate)} onConfirm={(note) => setActive(action.affiliate, true, note)} onClose={() => setAction(null)} /> : null}
+      {action?.kind === 'approve' ? (
         <RateDialog
           title={`Approve ${action.affiliate.name}?`}
-          description={`Their referral link goes live immediately and sales start earning commission. The standard rate is ${formatBps(standardBps)}.`}
+          description={`Their referral link goes live immediately and sales start earning commission.${
+            standardBps !== null ? ` The standard rate is ${formatBps(standardBps)}.` : ''
+          }`}
           confirmLabel="Approve"
           initialBps={standardBps}
+          allowEmpty
           onConfirm={(rateBps) => approve(action.affiliate, rateBps)}
           onClose={() => setAction(null)}
         />
       ) : null}
-      {action?.kind === 'rate' && rateOf(action.affiliate) !== null ? (
-        <RateDialog
-          title={`Change ${action.affiliate.name}'s rate`}
-          description={`Currently ${formatBps(rateOf(action.affiliate) as number)}.`}
-          confirmLabel="Save rate"
-          initialBps={rateOf(action.affiliate) as number}
-          onConfirm={(rateBps) => changeRate(action.affiliate, rateBps)}
-          onClose={() => setAction(null)}
-        />
-      ) : null}
+      {action?.kind === 'rate' ? <EditRateDialog affiliate={action.affiliate} rateBps={rateOf(action.affiliate)} onConfirm={(rateBps) => changeRate(action.affiliate, rateBps)} onClose={() => setAction(null)} /> : null}
     </>
+  );
+}
+
+interface AffiliateDialogProps<V> {
+  affiliate: User;
+  /** The affiliate's effective rate, or null when it isn't known. */
+  rateBps: number | null;
+  onConfirm: (value: V) => Promise<void>;
+  onClose: () => void;
+}
+
+function ReactivateDialog({ affiliate, rateBps, onConfirm, onClose }: AffiliateDialogProps<string>) {
+  const selfPaused = affiliate.deactivatedBy === 'affiliate';
+  const description = [
+    selfPaused
+      ? `${affiliate.name} paused their account themselves${affiliate.deactivationReason ? ` ("${affiliate.deactivationReason}")` : ''}. Reactivating overrides their choice, so consider checking with them first.`
+      : null,
+    `Their referral link goes live again${rateBps !== null ? ` at their ${formatBps(rateBps)} rate` : ''}${
+      affiliate.deactivatedBy === 'ops' ? ', and their held payouts go out in the next payout run' : ''
+    }.`,
+  ]
+    .filter(Boolean)
+    .join(' ');
+  return (
+    <ConfirmDialog
+      title={`Reactivate ${affiliate.name}?`}
+      description={description}
+      confirmLabel={selfPaused ? 'Reactivate anyway' : 'Reactivate'}
+      reasonLabel="Note for the audit log"
+      onConfirm={onConfirm}
+      onClose={onClose}
+    />
+  );
+}
+
+function EditRateDialog({ affiliate, rateBps, onConfirm, onClose }: AffiliateDialogProps<number>) {
+  if (rateBps === null) return null;
+  return (
+    <RateDialog
+      title={`Change ${affiliate.name}'s rate`}
+      description={`Currently ${formatBps(rateBps)}.`}
+      confirmLabel="Save rate"
+      initialBps={rateBps}
+      requireChange
+      onConfirm={async (next) => {
+        if (next !== null) await onConfirm(next);
+      }}
+      onClose={onClose}
+    />
   );
 }
